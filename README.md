@@ -36,7 +36,7 @@ flaui-demo/
 │       └── FlaUI.Window.Extensions.csproj
 └── tests/
     ├── CounterTests.cs                  # NUnit UI automation tests
-    ├── PageObjects/Counter.cs           # Counter page object
+    ├── WindowObjects/Counter.cs           # Counter window object
     └── flaui-demo.Tests.csproj          # Test project (NUnit + NExpect + FlaUI.UIA3)
 ```
 

@@ -40,26 +40,10 @@ jobs:
           --logger "trx;LogFileName=counter-tests.trx"
           --results-directory TestResults
 
-      - name: Install trx2html
-        if: always()
-        run: dotnet tool install --global TrxToHtml || dotnet tool update --global TrxToHtml
-
-      - name: Generate HTML report
-        if: always()
-        shell: pwsh
-        run: |
-          $env:PATH = "$env:USERPROFILE\.dotnet\tools;$env:PATH"
-          $trx = Get-ChildItem -Path TestResults -Filter *.trx | Select-Object -First 1
-          if ($trx) {
-            TrxToHtml $trx.FullName -o TestResults/counter-tests.html
-          }
-
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: counter-test-results
-          path: |
-            TestResults/counter-tests.html
-            TestResults/*.trx
+          path: TestResults
           if-no-files-found: warn

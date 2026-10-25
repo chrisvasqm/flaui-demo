@@ -35,15 +35,21 @@ public static class WindowExtensions
     /// Creates a lazy locator that finds a descendant by its <c>AutomationId</c> (e.g. WPF <c>x:Name</c>).
     /// Does not query the UI until an action or state query is called.
     /// </summary>
-    public static Locator FindElement(this AutomationElement root, string automationId) =>
-        Locator.ByAutomationId(() => root, automationId);
+    public static Locator FindElement(this AutomationElement root, string automationId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(automationId);
+        return Locator.ByAutomationId(() => root, automationId);
+    }
 
     /// <summary>
     /// Creates a lazy locator that finds a descendant matching a custom FlaUI condition.
     /// Does not query the UI until an action or state query is called.
     /// </summary>
-    public static Locator FindElement(this AutomationElement root, Func<ConditionFactory, ConditionBase> condition, string description = "custom condition") =>
-        new(root, condition, description);
+    public static Locator FindElement(this AutomationElement root, Func<ConditionFactory, ConditionBase> condition, string description = "custom condition")
+    {
+        ArgumentNullException.ThrowIfNull(condition);
+        return new Locator(root, condition, description);
+    }
 
     /// <summary>
     /// Creates a lazy locator that finds a descendant by its <c>AutomationId</c> (Playwright alias for <see cref="FindElement(AutomationElement, string)"/>).
@@ -54,14 +60,24 @@ public static class WindowExtensions
     /// <summary>
     /// Creates a lazy locator that finds a descendant by its visible text (<c>Name</c> property).
     /// </summary>
-    public static Locator GetByText(this AutomationElement root, string text) =>
-        Locator.ByText(() => root, text);
+    public static Locator GetByText(this AutomationElement root, string text)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(text);
+        return Locator.ByText(() => root, text);
+    }
 
     /// <summary>
     /// Creates a lazy locator that finds a descendant by its UIA <see cref="ControlType"/> (e.g. <c>ControlType.Button</c>) and optional accessible name.
     /// </summary>
-    public static Locator GetByRole(this AutomationElement root, ControlType role, string? name = null) =>
-        Locator.ByRole(() => root, role, name);
+    public static Locator GetByRole(this AutomationElement root, ControlType role, string? name = null)
+    {
+        if (!Enum.IsDefined(typeof(ControlType), role))
+        {
+            throw new ArgumentOutOfRangeException(nameof(role));
+        }
+
+        return Locator.ByRole(() => root, role, name);
+    }
 }
 
 /// <summary>
@@ -72,7 +88,7 @@ public sealed class Locator
     private static readonly int[] ActionBackoffMs = [20, 50, 100, 100, 500];
 
     /// <summary>
-    /// Default timeout for locator actions and queries (30 seconds).
+    /// Default timeout for locator actions and queries.
     /// </summary>
     public static TimeSpan DefaultTimeout { get; set; } = TimeSpan.FromSeconds(30);
 
@@ -104,14 +120,20 @@ public sealed class Locator
     /// <summary>
     /// Chains a child locator that finds a descendant by its <c>AutomationId</c> inside this locator.
     /// </summary>
-    public Locator FindElement(string automationId) =>
-        ByAutomationId(TryResolve, automationId, _description);
+    public Locator FindElement(string automationId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(automationId);
+        return ByAutomationId(TryResolve, automationId, _description);
+    }
 
     /// <summary>
     /// Chains a child locator that finds a descendant matching a custom FlaUI condition inside this locator.
     /// </summary>
-    public Locator FindElement(Func<ConditionFactory, ConditionBase> condition, string description = "custom condition") =>
-        new(TryResolve, condition, ChainDescription(_description, description));
+    public Locator FindElement(Func<ConditionFactory, ConditionBase> condition, string description = "custom condition")
+    {
+        ArgumentNullException.ThrowIfNull(condition);
+        return new Locator(TryResolve, condition, ChainDescription(_description, description));
+    }
 
     /// <summary>
     /// Chains a child locator that finds a descendant by its <c>AutomationId</c> inside this locator.
@@ -121,34 +143,60 @@ public sealed class Locator
     /// <summary>
     /// Chains a child locator that finds a descendant by its visible text (<c>Name</c> property) inside this locator.
     /// </summary>
-    public Locator GetByText(string text) =>
-        ByText(TryResolve, text, _description);
+    public Locator GetByText(string text)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(text);
+        return ByText(TryResolve, text, _description);
+    }
 
     /// <summary>
     /// Chains a child locator that finds a descendant by its <see cref="ControlType"/> and optional name inside this locator.
     /// </summary>
-    public Locator GetByRole(ControlType role, string? name = null) =>
-        ByRole(TryResolve, role, name, _description);
+    public Locator GetByRole(ControlType role, string? name = null)
+    {
+        if (!Enum.IsDefined(typeof(ControlType), role))
+        {
+            throw new ArgumentOutOfRangeException(nameof(role));
+        }
 
-    internal static Locator ByAutomationId(Func<AutomationElement?> rootResolver, string automationId, string? parentDescription = null) =>
-        new(rootResolver, cf => cf.ByAutomationId(automationId), ChainDescription(parentDescription, $"AutomationId='{automationId}'"));
+        return ByRole(TryResolve, role, name, _description);
+    }
 
-    internal static Locator ByText(Func<AutomationElement?> rootResolver, string text, string? parentDescription = null) =>
-        new(rootResolver, cf => cf.ByName(text), ChainDescription(parentDescription, $"Text='{text}'"));
+    internal static Locator ByAutomationId(Func<AutomationElement?> rootResolver, string automationId, string? parentDescription = null)
+    {
+        ArgumentNullException.ThrowIfNull(rootResolver);
+        ArgumentException.ThrowIfNullOrWhiteSpace(automationId);
+        return new Locator(rootResolver, cf => cf.ByAutomationId(automationId), ChainDescription(parentDescription, $"AutomationId='{automationId}'"));
+    }
 
-    internal static Locator ByRole(Func<AutomationElement?> rootResolver, ControlType role, string? name, string? parentDescription = null) =>
-        new(
+    internal static Locator ByText(Func<AutomationElement?> rootResolver, string text, string? parentDescription = null)
+    {
+        ArgumentNullException.ThrowIfNull(rootResolver);
+        ArgumentException.ThrowIfNullOrWhiteSpace(text);
+        return new Locator(rootResolver, cf => cf.ByName(text), ChainDescription(parentDescription, $"Text='{text}'"));
+    }
+
+    internal static Locator ByRole(Func<AutomationElement?> rootResolver, ControlType role, string? name, string? parentDescription = null)
+    {
+        ArgumentNullException.ThrowIfNull(rootResolver);
+        if (!Enum.IsDefined(typeof(ControlType), role))
+        {
+            throw new ArgumentOutOfRangeException(nameof(role));
+        }
+
+        return new Locator(
             rootResolver,
             cf => name is null
                 ? cf.ByControlType(role)
                 : cf.ByControlType(role).And(cf.ByName(name)),
             ChainDescription(parentDescription, name is null ? $"Role={role}" : $"Role={role}, Name='{name}'"));
+    }
 
     private static string ChainDescription(string? parentDescription, string description) =>
-        parentDescription is null ? description : $"{parentDescription} >> {description}";
+        string.IsNullOrEmpty(parentDescription) ? description : $"{parentDescription} >> {description}";
 
     /// <summary>
-    /// Waits until the element reaches the specified <paramref name="state"/> (defaults to <see cref="WaitForState.Visible"/>).
+    /// Waits until the element reaches the specified <paramref name="state"/>.
     /// </summary>
     public Locator WaitFor(WaitForState state = WaitForState.Visible, TimeSpan? timeout = null)
     {
@@ -221,6 +269,7 @@ public sealed class Locator
     /// </summary>
     public void Fill(string value, TimeSpan? timeout = null)
     {
+        ArgumentNullException.ThrowIfNull(value);
         var element = ResolveActionable(timeout, requireStable: false, requireEditable: true);
 
         if (element.Patterns.Value.TryGetPattern(out var valuePattern))
@@ -251,6 +300,7 @@ public sealed class Locator
     /// </summary>
     public void Type(string text, TimeSpan? timeout = null)
     {
+        ArgumentNullException.ThrowIfNull(text);
         FocusForKeyboard(timeout);
         Keyboard.Type(text);
     }
@@ -353,14 +403,24 @@ public sealed class Locator
     /// <summary>
     /// Waits for the combo box to be visible, stable, and enabled, then selects an item by its text.
     /// </summary>
-    public void SelectOption(string textOrValue, TimeSpan? timeout = null) =>
+    public void SelectOption(string textOrValue, TimeSpan? timeout = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(textOrValue);
         ResolveActionable(timeout).AsComboBox().Select(textOrValue);
+    }
 
     /// <summary>
     /// Waits for the combo box to be visible, stable, and enabled, then selects an item by its zero-based index.
     /// </summary>
-    public void SelectOption(int index, TimeSpan? timeout = null) =>
+    public void SelectOption(int index, TimeSpan? timeout = null)
+    {
+        if (index < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(index));
+        }
+
         ResolveActionable(timeout).AsComboBox().Select(index);
+    }
 
     /// <summary>
     /// Returns <c>true</c> immediately if the element is currently attached and visible (does not wait).
@@ -452,14 +512,14 @@ public sealed class Locator
     }
 
     private AutomationElement ResolveAttached(TimeSpan? timeout) =>
-        Poll<AutomationElement>(
+        Poll(
             timeout,
             () =>
             {
                 var element = TryResolve();
                 return element is not null
-                    ? (true, element, null)
-                    : (false, null, "element not found");
+                    ? (true, element, (string?)null)
+                    : (false, (AutomationElement?)null, "element not found");
             },
             "Waiting")!;
 
@@ -471,7 +531,7 @@ public sealed class Locator
         Rectangle? previousBounds = null;
         AutomationElement? stableCandidate = null;
 
-        return Poll<AutomationElement>(
+        return Poll(
             timeout,
             () =>
             {
@@ -480,7 +540,7 @@ public sealed class Locator
                 if (element is null)
                 {
                     previousBounds = null;
-                    return (false, null, "element is not attached");
+                    return (false, (AutomationElement?)null, "element is not attached");
                 }
 
                 try
@@ -489,34 +549,34 @@ public sealed class Locator
                     if (bounds is null)
                     {
                         previousBounds = null;
-                        return (false, null, "element is not visible");
+                        return (false, (AutomationElement?)null, "element is not visible");
                     }
 
                     if (requireStable && previousBounds != bounds)
                     {
                         previousBounds = bounds;
                         stableCandidate = element;
-                        return (false, null, "element is not stable");
+                        return (false, (AutomationElement?)null, "element is not stable");
                     }
 
                     if (!element.Properties.IsEnabled.ValueOrDefault)
                     {
-                        return (false, null, "element is not enabled");
+                        return (false, (AutomationElement?)null, "element is not enabled");
                     }
 
                     if (requireEditable &&
                         element.Patterns.Value.TryGetPattern(out var valuePattern) &&
                         valuePattern.IsReadOnly.Value)
                     {
-                        return (false, null, "element is read-only");
+                        return (false, (AutomationElement?)null, "element is read-only");
                     }
 
-                    return (true, element, null);
+                    return (true, element, (string?)null);
                 }
                 catch (Exception ex)
                 {
                     previousBounds = null;
-                    return (false, null, ex.Message);
+                    return (false, (AutomationElement?)null, ex.Message);
                 }
             },
             "Action")!;

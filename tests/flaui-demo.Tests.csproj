@@ -14,5 +14,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\flaui-demo.csproj" />
+    <ProjectReference Include="..\src\FlaUI.Window.Extensions\FlaUI.Window.Extensions.csproj" />
   </ItemGroup>
 </Project>

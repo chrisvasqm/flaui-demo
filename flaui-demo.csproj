@@ -8,7 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <HotReloadAutoRestart>true</HotReloadAutoRestart>
-    <DefaultItemExcludes>$(DefaultItemExcludes);tests\**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);tests\**;src\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>

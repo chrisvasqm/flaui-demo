@@ -1,11 +1,12 @@
 using System.Diagnostics;
 using System.Drawing;
+using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Conditions;
 using FlaUI.Core.Definitions;
 using FlaUI.Core.Input;
 using FlaUI.Core.WindowsAPI;
 
-namespace FlaUI.Core.AutomationElements;
+namespace FlaUI.Window.Extensions;
 
 /// <summary>
 /// Element state to wait for in <see cref="Locator.WaitFor"/>.
@@ -27,9 +28,8 @@ public enum WaitForState
 
 /// <summary>
 /// Playwright-style locators, auto-waiting actions, and state queries for FlaUI <see cref="AutomationElement"/>.
-/// Drop this single file into any test project; it shares the <c>FlaUI.Core.AutomationElements</c> namespace.
 /// </summary>
-public static class AutomationElementExtensions
+public static class WindowExtensions
 {
     /// <summary>
     /// Creates a lazy locator that finds a descendant by its <c>AutomationId</c> (e.g. WPF <c>x:Name</c>).
@@ -78,6 +78,7 @@ public sealed class Locator
 
     private readonly Func<AutomationElement?> _rootResolver;
     private readonly Func<ConditionFactory, ConditionBase> _condition;
+    private ConditionBase? _cachedCondition;
     private readonly string _description;
 
     /// <summary>
@@ -156,22 +157,15 @@ public sealed class Locator
             () =>
             {
                 var element = TryResolve();
-                return state switch
+                var (met, failure) = state switch
                 {
-                    WaitForState.Attached => element is not null
-                        ? (true, true, null)
-                        : (false, false, "element is not attached"),
-                    WaitForState.Detached => element is null
-                        ? (true, true, null)
-                        : (false, false, "element is still attached"),
-                    WaitForState.Visible => IsElementVisible(element)
-                        ? (true, true, null)
-                        : (false, false, element is null ? "element is not attached" : "element is not visible"),
-                    WaitForState.Hidden => !IsElementVisible(element)
-                        ? (true, true, null)
-                        : (false, false, "element is still visible"),
+                    WaitForState.Attached => (element is not null, "element is not attached"),
+                    WaitForState.Detached => (element is null, "element is still attached"),
+                    WaitForState.Visible => (IsElementVisible(element), element is null ? "element is not attached" : "element is not visible"),
+                    WaitForState.Hidden => (!IsElementVisible(element), "element is still visible"),
                     _ => throw new ArgumentOutOfRangeException(nameof(state), state, null)
                 };
+                return (met, true, met ? null : failure);
             },
             $"WaitFor({state})");
 
@@ -188,21 +182,21 @@ public sealed class Locator
 
         if (!forceMouse)
         {
-            if (element.Patterns.Invoke.IsSupported)
+            if (element.Patterns.Invoke.TryGetPattern(out var invoke))
             {
-                element.Patterns.Invoke.Pattern.Invoke();
+                invoke.Invoke();
                 return;
             }
 
-            if (element.Patterns.Toggle.IsSupported)
+            if (element.Patterns.Toggle.TryGetPattern(out var toggle))
             {
-                element.Patterns.Toggle.Pattern.Toggle();
+                toggle.Toggle();
                 return;
             }
 
-            if (element.Patterns.SelectionItem.IsSupported)
+            if (element.Patterns.SelectionItem.TryGetPattern(out var selectionItem))
             {
-                element.Patterns.SelectionItem.Pattern.Select();
+                selectionItem.Select();
                 return;
             }
         }
@@ -229,9 +223,9 @@ public sealed class Locator
     {
         var element = ResolveActionable(timeout, requireStable: false, requireEditable: true);
 
-        if (element.Patterns.Value.IsSupported)
+        if (element.Patterns.Value.TryGetPattern(out var valuePattern))
         {
-            element.Patterns.Value.Pattern.SetValue(value);
+            valuePattern.SetValue(value);
             return;
         }
 
@@ -248,7 +242,7 @@ public sealed class Locator
     /// </summary>
     public void Press(VirtualKeyShort key, TimeSpan? timeout = null)
     {
-        ResolveActionable(timeout, requireStable: false).Focus();
+        FocusForKeyboard(timeout);
         Keyboard.Type(key);
     }
 
@@ -257,7 +251,7 @@ public sealed class Locator
     /// </summary>
     public void Type(string text, TimeSpan? timeout = null)
     {
-        ResolveActionable(timeout, requireStable: false).Focus();
+        FocusForKeyboard(timeout);
         Keyboard.Type(text);
     }
 
@@ -267,14 +261,14 @@ public sealed class Locator
     public string TextContent(TimeSpan? timeout = null)
     {
         var element = ResolveAttached(timeout);
-        if (element.Patterns.Value.IsSupported)
+        if (element.Patterns.Value.TryGetPattern(out var valuePattern))
         {
-            return element.Patterns.Value.Pattern.Value.Value ?? string.Empty;
+            return valuePattern.Value.Value ?? string.Empty;
         }
 
-        if (element.Patterns.Text.IsSupported)
+        if (element.Patterns.Text.TryGetPattern(out var textPattern))
         {
-            return element.Patterns.Text.Pattern.DocumentRange.GetText(-1).TrimEnd('\r', '\n');
+            return textPattern.DocumentRange.GetText(-1).TrimEnd('\r', '\n');
         }
 
         return element.Properties.Name.ValueOrDefault ?? string.Empty;
@@ -291,8 +285,8 @@ public sealed class Locator
     public string InputValue(TimeSpan? timeout = null)
     {
         var element = ResolveAttached(timeout);
-        return element.Patterns.Value.IsSupported
-            ? element.Patterns.Value.Pattern.Value.Value ?? string.Empty
+        return element.Patterns.Value.TryGetPattern(out var valuePattern)
+            ? valuePattern.Value.Value ?? string.Empty
             : element.AsTextBox().Text ?? string.Empty;
     }
 
@@ -303,17 +297,17 @@ public sealed class Locator
     {
         var element = ResolveActionable(timeout);
 
-        if (element.Patterns.SelectionItem.IsSupported)
+        if (element.Patterns.SelectionItem.TryGetPattern(out var selectionItem))
         {
-            element.Patterns.SelectionItem.Pattern.Select();
+            selectionItem.Select();
             return;
         }
 
-        if (element.Patterns.Toggle.IsSupported)
+        if (element.Patterns.Toggle.TryGetPattern(out var toggle))
         {
-            if (element.Patterns.Toggle.Pattern.ToggleState.Value != ToggleState.On)
+            if (toggle.ToggleState.Value != ToggleState.On)
             {
-                element.Patterns.Toggle.Pattern.Toggle();
+                toggle.Toggle();
             }
 
             return;
@@ -339,11 +333,11 @@ public sealed class Locator
     {
         var element = ResolveActionable(timeout);
 
-        if (element.Patterns.Toggle.IsSupported)
+        if (element.Patterns.Toggle.TryGetPattern(out var toggle))
         {
-            if (element.Patterns.Toggle.Pattern.ToggleState.Value != ToggleState.Off)
+            if (toggle.ToggleState.Value != ToggleState.Off)
             {
-                element.Patterns.Toggle.Pattern.Toggle();
+                toggle.Toggle();
             }
 
             return;
@@ -390,24 +384,34 @@ public sealed class Locator
     public bool IsChecked(TimeSpan? timeout = null)
     {
         var element = ResolveAttached(timeout);
-        if (element.Patterns.Toggle.IsSupported)
+        if (element.Patterns.Toggle.TryGetPattern(out var toggle))
         {
-            return element.Patterns.Toggle.Pattern.ToggleState.Value == ToggleState.On;
+            return toggle.ToggleState.Value == ToggleState.On;
         }
 
-        if (element.Patterns.SelectionItem.IsSupported)
+        if (element.Patterns.SelectionItem.TryGetPattern(out var selectionItem))
         {
-            return element.Patterns.SelectionItem.Pattern.IsSelected.Value;
+            return selectionItem.IsSelected.Value;
         }
 
         throw new InvalidOperationException($"Element does not support Toggle or SelectionItem pattern: {_description}");
     }
 
+    private void FocusForKeyboard(TimeSpan? timeout) =>
+        ResolveActionable(timeout, requireStable: false).Focus();
+
     private AutomationElement? TryResolve()
     {
         try
         {
-            return _rootResolver()?.FindFirstDescendant(_condition);
+            var root = _rootResolver();
+            if (root is null)
+            {
+                return null;
+            }
+
+            var condition = _cachedCondition ??= _condition(root.ConditionFactory);
+            return root.FindFirstDescendant(condition);
         }
         catch
         {
@@ -416,26 +420,34 @@ public sealed class Locator
     }
 
     private static bool IsElementVisible(AutomationElement? element) =>
-        TryGetVisibleBounds(element, out _);
+        GetVisibleBounds(element) is not null;
 
-    private static bool TryGetVisibleBounds(AutomationElement? element, out Rectangle bounds)
+    private static Rectangle? GetVisibleBounds(AutomationElement? element)
     {
-        bounds = default;
         if (element is null)
         {
-            return false;
+            return null;
         }
 
         try
         {
-            return !element.Properties.IsOffscreen.ValueOrDefault
-                && element.Properties.BoundingRectangle.TryGetValue(out bounds)
-                && bounds.Width > 0
-                && bounds.Height > 0;
+            if (element.Properties.IsOffscreen.ValueOrDefault)
+            {
+                return null;
+            }
+
+            if (!element.Properties.BoundingRectangle.TryGetValue(out var bounds)
+                || bounds.Width <= 0
+                || bounds.Height <= 0)
+            {
+                return null;
+            }
+
+            return bounds;
         }
         catch
         {
-            return false;
+            return null;
         }
     }
 
@@ -457,12 +469,14 @@ public sealed class Locator
         bool requireEditable = false)
     {
         Rectangle? previousBounds = null;
+        AutomationElement? stableCandidate = null;
 
         return Poll<AutomationElement>(
             timeout,
             () =>
             {
-                var element = TryResolve();
+                var element = stableCandidate ?? TryResolve();
+                stableCandidate = null;
                 if (element is null)
                 {
                     previousBounds = null;
@@ -471,7 +485,8 @@ public sealed class Locator
 
                 try
                 {
-                    if (!TryGetVisibleBounds(element, out var bounds))
+                    var bounds = GetVisibleBounds(element);
+                    if (bounds is null)
                     {
                         previousBounds = null;
                         return (false, null, "element is not visible");
@@ -480,6 +495,7 @@ public sealed class Locator
                     if (requireStable && previousBounds != bounds)
                     {
                         previousBounds = bounds;
+                        stableCandidate = element;
                         return (false, null, "element is not stable");
                     }
 
@@ -489,8 +505,8 @@ public sealed class Locator
                     }
 
                     if (requireEditable &&
-                        element.Patterns.Value.IsSupported &&
-                        element.Patterns.Value.Pattern.IsReadOnly.Value)
+                        element.Patterns.Value.TryGetPattern(out var valuePattern) &&
+                        valuePattern.IsReadOnly.Value)
                     {
                         return (false, null, "element is read-only");
                     }
@@ -533,16 +549,8 @@ public sealed class Locator
             var delayMs = ActionBackoffMs[Math.Min(attempt, ActionBackoffMs.Length - 1)];
             attempt++;
 
-            var sleepTime = TimeSpan.FromMilliseconds(delayMs);
-            if (sleepTime > remaining)
-            {
-                sleepTime = remaining;
-            }
-
-            if (sleepTime > TimeSpan.Zero)
-            {
-                Thread.Sleep(sleepTime);
-            }
+            var delay = TimeSpan.FromMilliseconds(delayMs);
+            Thread.Sleep(delay < remaining ? delay : remaining);
         }
     }
 }

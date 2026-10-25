@@ -1,4 +1,5 @@
 using FlaUI.Core.AutomationElements;
+using FlaUI.Window.Extensions;
 
 namespace flaui_demo.Tests;
 

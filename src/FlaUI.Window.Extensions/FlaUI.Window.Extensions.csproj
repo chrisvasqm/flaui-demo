@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows7.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>FlaUI.Window.Extensions</RootNamespace>
+    <AssemblyName>FlaUI.Window.Extensions</AssemblyName>
+
+    <PackageId>FlaUI.Window.Extensions</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>Christian Vasquez</Authors>
+    <Description>Playwright-style locators, auto-waiting actions, and state queries for FlaUI.</Description>
+    <PackageTags>flaui;ui-automation;uia3;playwright;locators;testing</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageProjectUrl>https://github.com/chrisvasqm/flaui-demo</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/chrisvasqm/flaui-demo</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FlaUI.Core" Version="5.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>
